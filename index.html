@@ -208,7 +208,7 @@ td.num, th.num { text-align: right; font-family: var(--f-mono); }
 <script>
 (() => {
 "use strict";
-const STORE = "torneio-sino-nr07-v1";
+const STORE = "torneio-sino-nr07-v2";
 const GROUPS0 = [
   ["G02", "Organização HMP + chupa sangue"], ["G03", "ERGON"], ["G04", "ERGO4"], ["G05", "UFFICIÊNCIA"], ["G06", "GARGALO"],
   ["G07", "SST em Foco"], ["G08", "TIMEFET"], ["G09", "SHERLOCK PRODUÇÕES"], ["G10", "AURA+ERGO"], ["G11", "ENGENHARIA HUMANA"],
@@ -277,10 +277,10 @@ function fresh() {
     v: 1, view: "setup", started: false,
     groups: Object.fromEntries(GROUPS0.map(([id, name]) => [id, { id, name, rep: "" }])),
     seeds, matches: freshMatches(seeds),
-    cfg: { toWin: 2, nerfInMatch: false, seconds: 20 },
+    cfg: { toWin: 2, seconds: 20 },
     qOrder: shuffle(QUESTIONS.map((_, i) => i)), qPtr: 0,
-    stats: Object.fromEntries(GROUPS0.map(([id]) => [id, { q: 0, x: 0, w: 0, played: 0 }])),
-    cur: null, // { id, stage, qi, rang, correct, nerf, revealedAt }
+    stats: Object.fromEntries(GROUPS0.map(([id]) => [id, { q: 0, w: 0, played: 0 }])),
+    cur: null, // { id, stage, qi, rang, correct, revealedAt }
     sound: true,
   };
 }
@@ -366,7 +366,6 @@ function vSetup() {
         <ul class="rules">
           <li>A pergunta aparece no telão; um representante de cada grupo corre e bate no sino.</li>
           <li>Quem bater primeiro responde. <b>Acertou:</b> 1 ponto. <b>Errou:</b> o ponto vai para o outro grupo.</li>
-          <li>Quem acerta a pergunta atira com a Nerf. <b>Acertou o alvo:</b> +1 ponto extra.</li>
           <li>Partidas em <b>melhor de 3</b>: vence quem fizer ${S.cfg.toWin} pontos primeiro.</li>
           <li>Chave: 2 jogos preliminares, quartas, semifinal e final.</li>
         </ul>
@@ -379,7 +378,6 @@ function vSetup() {
           <div class="field" style="flex:1;min-width:140px"><label for="cfg-win">Formato das partidas</label>
             <select id="cfg-win"><option value="2" ${S.cfg.toWin === 2 ? "selected" : ""}>Melhor de 3</option><option value="1" ${S.cfg.toWin === 1 ? "selected" : ""}>Jogo único (se faltar tempo)</option></select></div>
         </div>
-        <label class="check"><input type="checkbox" id="cfg-nerf" ${S.cfg.nerfInMatch ? "checked" : ""}> <span>O ponto extra da Nerf também conta no placar da partida. Desligado, ele vale só no placar geral.</span></label>
       </div>
       <div class="panel stack">
         <h2 style="font-size:1.3rem">Chave</h2>
@@ -426,7 +424,6 @@ function vMatch() {
   const q = c.qi != null ? QUESTIONS[c.qi] : null;
   const rangName = c.rang ? gname(c.rang === "a" ? A : B) : "";
   const rangRunner = c.rang ? (c.rang === "a" ? m.runA : m.runB) : "";
-  const xs = id => S.stats[id].x;
   let body = "", ctrls = "", stamp = "";
   if (c.stage === "idle") {
     body = `<div class="qhidden"><div class="big">Pergunta ${m.qs + 1}</div><p class="muted" style="margin:0">Corredores na linha de largada. Revele a pergunta quando todos estiverem prontos.</p></div>`;
@@ -442,16 +439,11 @@ function vMatch() {
       if (c.peek) body += `<div class="peek">Gabarito: ${esc(q[1])}</div>`;
       ctrls = `<button class="btn ok" data-act="right">Acertou <kbd>C</kbd></button><button class="btn bad" data-act="wrong">Errou <kbd>E</kbd></button><button class="btn" data-act="peek" aria-pressed="${!!c.peek}">Gabarito <kbd>G</kbd></button>`;
     }
-    if (c.stage === "nerf") {
-      stamp = `<div class="stamp ok">APTO</div>`;
-      body += `<div class="banner gold">+1 para <b>${esc(rangName)}</b>. Agora o tiro da Nerf: acertou o alvo?</div>`;
-      ctrls = `<button class="btn ok" data-act="hit">Acertou o alvo (+1 extra) <kbd>S</kbd></button><button class="btn" data-act="miss">Errou o alvo <kbd>N</kbd></button>`;
-    }
     if (c.stage === "result") {
       if (c.correct === true) stamp = `<div class="stamp ok">APTO</div>`;
       if (c.correct === false) stamp = `<div class="stamp bad">INAPTO</div>`;
       const other = c.rang ? gname(c.rang === "a" ? B : A) : "";
-      const msg = c.correct === true ? `+1 para <b>${esc(rangName)}</b>${c.nerf ? " e +1 extra pela Nerf 🎯" : ""}.`
+      const msg = c.correct === true ? `+1 para <b>${esc(rangName)}</b>.`
         : c.correct === false ? `${esc(rangName)} errou: o ponto vai para <b>${esc(other)}</b>.`
         : `Ninguém bateu o sino. Pergunta sem ponto.`;
       body += `<div class="banner">${msg}</div><div class="answer"><span class="lbl">Resposta</span><span class="val">${esc(q[1])}</span><span class="ref">${esc(q[2])}</span></div>`;
@@ -464,15 +456,15 @@ function vMatch() {
   <div class="board">
     <div class="team a ${c.rang === "a" && c.stage !== "idle" ? "rang" : ""}"><div class="gname">${esc(gname(A))}</div>
       <input class="runner" id="run-a" data-run="a" value="${esc(m.runA)}" placeholder="Quem corre?" aria-label="Quem corre por ${esc(gname(A))}">
-      <div class="row" style="gap:14px"><div class="pips" aria-label="${m.sa} pontos">${pips(m.sa)}</div><div class="bonus">Extras (Nerf) no torneio: ${xs(A)}</div></div></div>
+      <div class="pips" aria-label="${m.sa} pontos">${pips(m.sa)}</div></div>
     <div class="vs"><div>×<small>${m.sa} – ${m.sb}</small></div></div>
     <div class="team b ${c.rang === "b" && c.stage !== "idle" ? "rang" : ""}"><div class="gname">${esc(gname(B))}</div>
       <input class="runner" id="run-b" data-run="b" value="${esc(m.runB)}" placeholder="Quem corre?" aria-label="Quem corre por ${esc(gname(B))}">
-      <div class="row" style="gap:14px"><div class="pips" aria-label="${m.sb} pontos">${pips(m.sb)}</div><div class="bonus">Extras (Nerf) no torneio: ${xs(B)}</div></div></div>
+      <div class="pips" aria-label="${m.sb} pontos">${pips(m.sb)}</div></div>
   </div>
   <section class="qcard${stamp ? " stamped" : ""}" aria-label="Pergunta">${stamp}<div class="qmeta"><span class="eyebrow">Pergunta ${m.qs + (c.stage === "idle" ? 1 : 0)}</span></div>${body}</section>
   <div class="controls">${ctrls}</div>
-  <p class="hint">Atalhos: <kbd>Espaço</kbd> avança · <kbd>1</kbd>/<kbd>2</kbd> quem bateu o sino · <kbd>C</kbd> acertou · <kbd>E</kbd> errou · <kbd>S</kbd>/<kbd>N</kbd> alvo da Nerf · <kbd>Z</kbd> desfaz</p>
+  <p class="hint">Atalhos: <kbd>Espaço</kbd> avança · <kbd>1</kbd>/<kbd>2</kbd> quem bateu o sino · <kbd>C</kbd> acertou · <kbd>E</kbd> errou · <kbd>Z</kbd> desfaz</p>
   </div>`;
 }
 
@@ -492,16 +484,17 @@ function vRank() {
   const elim = {}; // rodada em que caiu
   for (const r of ROUNDS) for (const id of r.ids) { const m = S.matches[id]; if (m.winner) { const a = side(m, "a"), b = side(m, "b"); elim[m.winner === a ? b : a] = r.name; } }
   const ch = champion();
-  const rows = ids.map(id => ({ id, ...S.stats[id], tot: S.stats[id].q + S.stats[id].x, fase: id === ch ? "Campeão" : elim[id] ? "Caiu na " + elim[id].toLowerCase() : S.started ? "Na disputa" : "–" }))
-    .sort((a, b) => (b.id === ch) - (a.id === ch) || b.w - a.w || b.tot - a.tot || b.x - a.x);
-  const sniper = ids.slice().sort((a, b) => S.stats[b].x - S.stats[a].x)[0];
+  const LVL = { Preliminar: 1, Quartas: 2, Semifinal: 3, Final: 4 };
+  const FASE = { Preliminar: "Caiu na preliminar", Quartas: "Caiu nas quartas", Semifinal: "Caiu na semifinal", Final: "Vice-campeão" };
+  const rows = ids.map(id => ({ id, ...S.stats[id], lvl: id === ch ? 5 : elim[id] ? LVL[elim[id]] : 6, fase: id === ch ? "Campeão" : elim[id] ? FASE[elim[id]] : S.started ? "Na disputa" : "–" }))
+    .sort((a, b) => b.lvl - a.lvl || b.w - a.w || b.q - a.q);
   return `<div class="stack">
   <div><div class="eyebrow">Placar geral</div><h1 style="font-size:clamp(1.8rem,4vw,2.8rem)">${ch ? "Pódio do Torneio do Sino" : "Como está o torneio"}</h1></div>
   ${ch ? `<div class="champ"><span class="eyebrow" style="color:var(--gold)">Campeão</span><div class="who">${esc(gname(ch))}</div>
-    <span class="muted">Vice: ${esc(gname(side(S.matches.F, "a") === ch ? side(S.matches.F, "b") : side(S.matches.F, "a")))}${S.stats[sniper].x ? ` · Melhor mira (Nerf): ${esc(gname(sniper))}, ${S.stats[sniper].x} acerto(s)` : ""}</span></div>` : ""}
-  <div class="panel table-scroll"><table><thead><tr><th>Grupo</th><th>Situação</th><th class="num">Vitórias</th><th class="num">Pontos de pergunta</th><th class="num">Extras (Nerf)</th><th class="num">Total</th></tr></thead>
-  <tbody>${rows.map(r => `<tr><td><b>${esc(gname(r.id))}</b></td><td>${r.fase}</td><td class="num">${r.w}</td><td class="num">${r.q}</td><td class="num">${r.x}</td><td class="num"><b>${r.tot}</b></td></tr>`).join("")}</tbody></table></div>
-  <p class="muted" style="margin:0">Pontos de pergunta incluem os ganhos quando o adversário errou. Desempate da tabela: vitórias, total e acertos na Nerf.</p>
+    <span class="muted">Vice: ${esc(gname(side(S.matches.F, "a") === ch ? side(S.matches.F, "b") : side(S.matches.F, "a")))}</span></div>` : ""}
+  <div class="panel table-scroll"><table><thead><tr><th>Grupo</th><th>Situação</th><th class="num">Vitórias</th><th class="num">Pontos</th></tr></thead>
+  <tbody>${rows.map(r => `<tr><td><b>${esc(gname(r.id))}</b></td><td>${r.fase}</td><td class="num">${r.w}</td><td class="num"><b>${r.q}</b></td></tr>`).join("")}</tbody></table></div>
+  <p class="muted" style="margin:0">Os pontos incluem os ganhos quando o adversário errou. Ordem da tabela: fase alcançada, vitórias e pontos.</p>
   </div>`;
 }
 
@@ -512,7 +505,7 @@ function openMatch(id) {
     if (!m.runA) m.runA = S.groups[side(m, "a")].rep || "";
     if (!m.runB) m.runB = S.groups[side(m, "b")].rep || "";
     if (!S.started) S.started = true;
-    S.cur = { id, stage: "idle", qi: null, rang: null, correct: null, nerf: false };
+    S.cur = { id, stage: "idle", qi: null, rang: null, correct: null };
     S.view = "match";
   });
 }
@@ -532,13 +525,12 @@ function act(a) {
   const c = S.cur, m = S.matches[c.id];
   const teamId = k => side(m, k);
   switch (a) {
-    case "reveal": if (c.stage !== "idle") return; commit(() => { c.qi = takeQuestion(); c.stage = "question"; c.revealedAt = Date.now(); m.qs++; c.rang = null; c.correct = null; c.nerf = false; c.peek = false; }); break;
+    case "reveal": if (c.stage !== "idle") return; commit(() => { c.qi = takeQuestion(); c.stage = "question"; c.revealedAt = Date.now(); m.qs++; c.rang = null; c.correct = null; c.peek = false; }); break;
     case "ring-a": case "ring-b": if (c.stage !== "question") return; sBell(); commit(() => { c.rang = a === "ring-a" ? "a" : "b"; c.stage = "answer"; }); break;
     case "nobody": if (c.stage !== "question") return; commit(() => { c.rang = null; c.correct = null; c.stage = "result"; }); break;
     case "peek": if (c.stage !== "answer") return; c.peek = !c.peek; save(); render(); break;
-    case "right": if (c.stage !== "answer") return; sOk(); commit(() => { c.correct = true; award(m, c.rang, 1); S.stats[teamId(c.rang)].q++; c.stage = "nerf"; }); break;
+    case "right": if (c.stage !== "answer") return; sOk(); commit(() => { c.correct = true; award(m, c.rang, 1); S.stats[teamId(c.rang)].q++; c.stage = "result"; }); break;
     case "wrong": if (c.stage !== "answer") return; sBad(); commit(() => { c.correct = false; const o = c.rang === "a" ? "b" : "a"; award(m, o, 1); S.stats[teamId(o)].q++; c.stage = "result"; }); break;
-    case "hit": case "miss": if (c.stage !== "nerf") return; if (a === "hit") sOk(); commit(() => { c.nerf = a === "hit"; if (c.nerf) { S.stats[teamId(c.rang)].x++; if (S.cfg.nerfInMatch) award(m, c.rang, 1); } c.stage = "result"; }); break;
     case "next": if (c.stage !== "result") return; commit(() => { if (!finishIfWon(m)) { c.stage = "idle"; c.qi = null; c.rang = null; } }); if (S.cur.stage === "done") tone([523, 659, 784, 1047], .6, "triangle", .22); break;
     case "close-win": if (c.stage !== "done") return; commit(() => { const fin = c.id === "F"; S.cur = null; S.view = fin ? "rank" : "bracket"; }); break;
   }
@@ -579,7 +571,6 @@ document.addEventListener("change", e => {
   const t = e.target;
   if (t.id === "cfg-sec") commit(() => { S.cfg.seconds = +t.value; });
   if (t.id === "cfg-win") commit(() => { S.cfg.toWin = +t.value; });
-  if (t.id === "cfg-nerf") commit(() => { S.cfg.nerfInMatch = t.checked; });
 });
 document.addEventListener("keydown", e => {
   if (e.target.matches("button") && (e.key === " " || e.key === "Enter")) return;
@@ -590,7 +581,7 @@ document.addEventListener("keydown", e => {
   if (S.view === "bracket" && k === " ") { const nr = nextReady(); if (nr) { e.preventDefault(); openMatch(nr.id); } return; }
   if (S.view !== "match" || !S.cur) return;
   const st = S.cur.stage;
-  const map = { " ": st === "idle" ? "reveal" : st === "result" ? "next" : st === "done" ? "close-win" : null, "1": "ring-a", "2": "ring-b", "0": "nobody", c: "right", e: "wrong", g: "peek", s: "hit", n: "miss" };
+  const map = { " ": st === "idle" ? "reveal" : st === "result" ? "next" : st === "done" ? "close-win" : null, "1": "ring-a", "2": "ring-b", "0": "nobody", c: "right", e: "wrong", g: "peek" };
   const a = map[k]; if (a) { e.preventDefault(); act(a); }
 });
 function toggleTheme() {
